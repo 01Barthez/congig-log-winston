@@ -104,12 +104,14 @@ const log = createLogger({
     ]
 });
 
-export default log;
+export default logs;
 ```
 
 exemple de log:
 
 ```typescript
+import log from './core/config/logger';
+
  log.info("ceci est une info")
  log.warn("ceci est un warn")
  log.error("ceci est une erreur")
@@ -134,6 +136,7 @@ app.use(morgan('combined', {
  }
 }));
 // ici app est une instance d'express (```const app = express();```)
+ ...
  ```
 
 Dans cet exemple, Morgan redirige les logs HTTP vers Winston pour une gestion centralisée et un formatage flexible des requêtes réseau.
