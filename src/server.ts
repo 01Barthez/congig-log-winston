@@ -27,6 +27,7 @@ app.use(morgan('combined', {
  log.info("ceci est une info")
  log.warn("ceci est un warn")
  log.error("ceci est une erreur")
+ log.error(new Error ("Ceci est une erreur avec une stack"))
  log.debug("ceci est un debug")
 
 export default app;
