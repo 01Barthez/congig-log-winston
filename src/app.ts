@@ -1,10 +1,13 @@
-// src/app.ts
-// Lancement du serveur
-import { envs } from './core/config/env';
+import log from './core/logger';
 import app from './server';
-app.listen(envs.PORT, () => {
-	console.log(`Server running on port http://localhost:${envs.PORT}/`);
-	console.log(`Documentation  : http://localhost:${envs.PORT}/api-docs`);
+import 'dotenv/config'
+
+// Running Server
+log.verbose("\n\n");
+log.info("*************LANCEMENT DU SERVEUR*************\n");
+
+// Running Server non sécurisé
+app.listen(process.env.PORT, () => {
+	log.info(`not server running on url: http://localhost:${process.env.PORT || 4000}/`);
+	log.info(`Documentation: http://localhost:${process.env.PORT || 4000}/api-docs\n`);
 });
-
-

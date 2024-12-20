@@ -1,157 +1,152 @@
-# Configuration des logs avec winston
+# Logging Configuration with Winston
 
-**Winston** est une bibliothèque de journalisation (*logging*) pour Node.js, conçue pour être simple à utiliser, flexible, et extensible. Elle permet de gérer les logs de manière structurée et d'enregistrer les messages dans différents formats et vers plusieurs destinations (transports), telles que la console, des fichiers, des bases de données, ou encore des services distants.
+**Winston** is a logging library for Node.js, designed to be simple to use, flexible, and extensible. It allows structured logging and supports multiple formats and destinations (transports) such as the console, files, databases, or remote services.
 
-## Caractéristiques principales de Winston
+## Key Features of Winston
 
-1- **Multiples transports** : Winston permet de définir plusieurs transports, ce qui signifie que les logs peuvent être envoyés simultanément vers différents supports, comme la console, des fichiers locaux, ou même des services comme Loggly, AWS CloudWatch, etc.
+1. **Multiple Transports**: Winston enables defining multiple transports, meaning logs can be sent simultaneously to different destinations, such as the console, local files, or services like Loggly, AWS CloudWatch, etc.
 
-2- **Niveaux de log personnalisés** : Il permet de définir des niveaux de log comme info, warn, error, etc., et de filtrer les messages en fonction de leur importance.
+2. **Custom Log Levels**: You can define log levels like info, warn, error, etc., and filter messages based on their importance.
 
-3- **Formats flexibles** : Winston offre la possibilité de formater les logs selon les besoins : JSON, texte simple, ou encore des formats customisés. Cela permet d'adapter l'affichage pour le développement (par exemple avec des couleurs) ou pour la production (format plus formel comme JSON).
+3. **Flexible Formats**: Winston provides the ability to format logs as needed: JSON, plain text, or custom formats. This allows adapting the display for development (e.g., with colors) or production (more formal formats like JSON).
 
-4- **Gestion des exceptions et promesses rejetées** : Il capture les erreurs non gérées et les rejets de promesses, assurant que rien ne passe inaperçu.
+4. **Exception and Rejection Handling**: It captures uncaught exceptions and unhandled promise rejections, ensuring no errors go unnoticed.
 
-5- **Rotation des fichiers** : Grâce à des extensions comme winston-daily-rotate-file, Winston permet de faire tourner les fichiers de logs automatiquement en fonction de la taille ou de la date (ex : un fichier par jour).
+5. **File Rotation**: Using extensions like `winston-daily-rotate-file`, Winston can automatically rotate log files based on size or date (e.g., one file per day).
 
-## Ma configuration de Winston pour gerer les Logs
+## My Winston Configuration for Managing Logs
 
-Dans cette configuration, nous utilisons Winston pour capturer les logs de différents niveaux (info, warn, error, debug), et les enregistrer dans des fichiers séparés avec rotation quotidienne pour éviter les fichiers trop volumineux. En production on filtre les logs a partir du niveau **debug** pour eviter de saturer... D'autre part nous gérons également l'affichage plus simplifié en developpement avec un format coloré et simplifié dans a console de developpement. Voici les détails :
+In this configuration, Winston captures logs of different levels (info, warn, error, debug) and saves them in separate files with daily rotation to avoid large file sizes. In production, logs are filtered starting from the **debug** level to prevent log saturation. For development, simplified and colored output is displayed in the console. Here are the details:
 
 ```typescript
-import winston, { createLogger, format, transports } from 'winston';
-import DailyRotateFile from 'winston-daily-rotate-file';
-import { envs } from './env';
+import winston, { createLogger, format, transports } from 'winston'; // Import Winston logging library and necessary components
+import DailyRotateFile from 'winston-daily-rotate-file'; // Import the DailyRotateFile transport for log rotation
 
-const { colorize, align } = winston.format;
+const { colorize, align } = winston.format; // Destructure format utilities from Winston
 
-// Fonction de configuration pour la rotation quotidienne des fichiers de logs
+// Define the log level based on the environment (e.g., production or development).
+// This is done to filter certain logs and prevent verbose logs from being sent in production.
+const logLevel = process.env.NODE_ENV === 'production' ? 'warn' : 'debug';
+
+// Function to create a transport for daily log rotation, which includes the filename pattern, log level, and maximum number of days to keep logs.
 const createTransport = (filename: string, level: string, maxFiles: number) => {
-    return new DailyRotateFile({
-        filename: `logs/${filename}-%DATE%.log`, // Nom du fichier basé sur le niveau
-        datePattern: 'YYYY-MM-DD', // Format de la date
-        zippedArchive: true, // Archiver les anciens fichiers en zip
-        maxSize: '30m', // Taille maximale du fichier de log
-        maxFiles: `${maxFiles}d`, // Nombre maximum de jours à conserver
-        level // Niveau de log (si spécifié)
-    });
+  return new DailyRotateFile({
+    filename: `logs/${filename}-%DATE%.log`, // Log filename with date pattern
+    datePattern: 'YYYY-MM-DD', // Date format for the logs
+    zippedArchive: true, // Archive old log files as zip files
+    maxSize: '30m', // Maximum size for each log file (30 MB)
+    maxFiles: `${maxFiles}d`, // Maximum number of days to retain log files
+    level, // Log level (info, warn, debug, error, etc.)
+  });
 };
 
-// Definir le niveau de log en fonction de l'environement... Ceci pour filtrer certains log et ne pas les envoyer en production 
-const logLevel = envs.NODE_ENV === 'production' ? 'info' : 'debug';
-
-// Transporteur pour les log généraux
+// Transport for general logs
 const transport = createTransport('application', 'info', 14);
 
-// Transporteur pour les log de warn
+// Transport for warning logs
 const warnTransport = createTransport('warns', 'warn', 21);
 
-// Transporteur pour les log de debug
+// Transport for debug logs
 const debugTransport = createTransport('debugs', 'debug', 21);
 
-// Transporteur pour les log d'erreur
+// Transport for error logs
 const errorTransport = createTransport('errors', 'error', 30);
 
 /**
- * Crée un logger Winston configuré pour enregistrer les logs dans des fichiers avec rotation quotidienne.
- * Gère à la fois les logs généraux, les logs de warning et les logs d'erreurs.
- * Les exceptions non capturées et les promesses rejetées sont également traitées.
+ * Creates a Winston logger configured to log to daily rotating files.
+ * This logger handles general logs, warning logs, and error logs.
+ * It also manages uncaught exceptions and unhandled promise rejections.
  */
 const log = createLogger({
-    level: logLevel,
-    format: format.combine(
-        format.timestamp({
-            format: 'YYYY-MM-DD HH:mm:ss' // Format de la date dans les fichiers
-        }),
-        format.errors({ stack: true }), // pour afficher les stacks des erreurs
-        align(), //method aligns the log messages
-        envs.NODE_ENV === 'production' // gerer l'affichage des logs en fonction de l'environnement de dévéloppement
-            ? format.json() // Production : logs au format JSON
-            : format.prettyPrint() // Développement : logs plus lisibles
-    ),
-    defaultMeta: {
-        service: 'user-service'
-    },
-    transports: [
-        envs.NODE_ENV === 'production' ?
-            new transports.Console({
-                format: format.combine(
-                    format.timestamp(),
-                    format.json() // JSON output pour la console aussi
-                ),
-                level: 'info' // On affiche seulement 'info' et supérieur en production
+  level: logLevel, // Set the log level based on the environment
+  format: format.combine(
+    format.timestamp({
+      format: 'YYYY-MM-DD HH:mm:ss', // Timestamp format for logs
+    }),
+    format.errors({ stack: true }), // Include stack traces for error logs
+    align(), // Align log messages for better readability
+    process.env.NODE_ENV === 'production' // Check if the environment is production
+      ? format.json() // In production, log in JSON format
+      : format.prettyPrint() // In development, log in a more readable format
+  ),
+  defaultMeta: {
+    service: 'user-service', // Default metadata for logs (service name)
+  },
+  transports: [
+    process.env.NODE_ENV === 'production'
+      ? new transports.Console({
+          format: format.combine(
+            format.timestamp(), // Add timestamp to console logs
+            format.json() // Log to console in JSON format in production
+          ),
+          level: 'info', // Display only 'info' and above logs in production
+        })
+      : new transports.Console({
+          format: format.combine(
+            colorize({ all: true }), // Colorize log output in the console
+            format.printf(({ level, message, timestamp }) => {
+              return `${timestamp} [${level}]: ${message}`; // Custom format for console logs
             })
-            :
-            new transports.Console({
-                format: format.combine(
-                    colorize({ all: true }),
-                    format.printf(({ level, message, timestamp }) => {
-                        return `${timestamp} [${level}]: ${message}`;
-                    })
-                ),
-                level: 'debug' // On affiche tous les niveaux en développement
-            }), // pour afficher les logs dans la console
-        transport, // Logs généraux avec rotation quotidienne
-        errorTransport, // Fichier dédié pour les error avec rotation
-        warnTransport, // Fichier dédié pour les warn avec rotation
-        debugTransport, // Fichier dédié pour les warn avec rotation
-    ],
-    exceptionHandlers: [
-        new transports.File({ filename: 'logs/exceptions.log' }) // Capture les exceptions non interceptées pour éviter que l'application ne se termine de manière inattendue
-    ],
-    rejectionHandlers: [
-        new transports.File({ filename: 'logs/rejections.log' }) // Capture les promesses rejetées
-    ]
+          ),
+          level: 'debug', // Display all log levels in development
+        }),
+    transport, // General logs with daily rotation
+    errorTransport, // Log errors to a separate file with daily rotation
+    warnTransport, // Log warnings to a separate file with daily rotation
+    debugTransport, // Log debug information to a separate file with daily rotation
+  ],
+  exceptionHandlers: [
+    new transports.File({ filename: 'logs/exceptions.log' }), // Handle uncaught exceptions and log them to a file
+  ],
+  rejectionHandlers: [
+    new transports.File({ filename: 'logs/rejections.log' }), // Handle unhandled promise rejections and log them to a file
+  ],
 });
 
-export default logs;
+export default log; // Export the logger instance for use in other parts of the application
 ```
 
-exemple de log:
+### Example Usage
 
 ```typescript
-import log from './core/config/logger';
+import log from './core/logger'; // Replace with your logger path
 
- log.info("ceci est une info")
- log.warn("ceci est un warn")
- log.error("ceci est une erreur")
- log.debug("ceci est un debug")
- ```
+log.info("This is an info message");
+log.warn("This is a warning message");
+log.error("This is an error message");
+log.debug("This is a debug message");
+```
 
-resultat dans la console:
+### Console Output Example
+
 ![alt text](public/logResult.png)
 
-## Configurer Morgan avec Winston
+## Integrating Morgan with Winston
 
-Pour capturer les requêtes HTTP, on peut intégrer Morgan (un middleware de journalisation pour Express) avec Winston, en redirigeant les logs HTTP vers Winston. Voici comment le configurer :
+To capture HTTP requests, Morgan (a logging middleware for Express) can be integrated with Winston by redirecting HTTP logs to Winston. Here's how to configure it:
 
 ```typescript
-import morgan from 'morgan';
-import log from './core/config/logger';
+import morgan from 'morgan'; // Import Morgan
+import log from './core/logger'; // Import your logger file
 
-// Middleware de journalisation avec Morgan qui utilise Winston
-app.use(morgan('combined', {
+// Logging middleware with Morgan using Winston
+app.use(morgan(':method :url  :status :response-time ms', {
  stream: {
-  write: (message) => log.http(message.trim()) // Redirige les logs HTTP vers Winston
+  write: (message) => log.http(message.trim()) // Redirect HTTP Log through winston
  }
-}));
-// ici app est une instance d'express (```const app = express();```)
- ...
- ```
+ }));
+// Here, `app` is an instance of Express (`const app = express();`)
+```
 
-Dans cet exemple, Morgan redirige les logs HTTP vers Winston pour une gestion centralisée et un formatage flexible des requêtes réseau.
+## Tip: Disable Console Logs in Production
 
-## Astuce: Desactiver Console en production
+Console logs such as `console.log` and `console.warn` should not be used in production as they can harm performance by generating unnecessary noise in the logs. They can also expose sensitive information, compromising security. Additionally, they lack advanced features like log levels and file rotation, making it harder to track errors and maintain the application. Using a logger like Winston provides better control and professional log management in production. Here's how to disable them if they were accidentally left in the code during development:
 
-Les console.log et console.warn ne doivent pas être utilisés en production car ils peuvent nuire aux performances en générant du bruit inutile dans les logs. Ils peuvent également exposer des informations sensibles, compromettant la sécurité. De plus, ils manquent de fonctionnalités avancées comme la gestion des niveaux de log et la rotation des fichiers, ce qui rend difficile le suivi des erreurs et la maintenance. Utiliser un logger comme Winston permet un meilleur contrôle et une gestion plus professionnelle des logs en production. Il est donc plus jusdicieux de les desactiver si jamais ils ont été glissé dans le code durant le dévéloppement...
-
-Voici un exemple de façon de le desactiver en production en configurant un midddleware...
-
-```import { envs } from "@src/core/config/env";
+```typescript
 import { Request, Response, NextFunction } from "express";
-
-const disableLogsInProduction = (req: Request, res: Response, next: NextFunction) => {
-    if (envs.NODE_ENV === 'production') {
+import 'dotenv/config'
+const disableLogsInProduction = (_req: Request, _res: Response, next: NextFunction) => {
+    if (process.env.NODE_ENV === 'production') {
         console.log = () => { };
         console.warn = () => { };
         console.error = () => { };
@@ -164,7 +159,7 @@ const disableLogsInProduction = (req: Request, res: Response, next: NextFunction
 export default disableLogsInProduction;
 ```
 
-puis l'utiliser dans le fichier des configuration ou du serveur...
+Then use it in the configuration or server file:
 
 ```typescript
 import express from 'express';
@@ -172,9 +167,6 @@ import disableLogsInProduction from './middleware/disableLog';
 
 const app = express();
 
-// Desactiver les logs de console en production
-app.use(disableLogsInProduction); // Middleware pour désactiver les logs
+// Disable console logs in production
+app.use(disableLogsInProduction); // Middleware to disable logs
 ```
-
-**Merci pour la lecture :-)**
-[Barthez Kenwou](https://www.linkedin.com/in/barthez-kenwou/?)
